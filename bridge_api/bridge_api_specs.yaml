@@ -1,0 +1,188 @@
+openapi: 3.0.0
+info:
+  title: Philips Hue API
+  description: This is a description of Philips Hue API in OpenAPI format.
+  version: 1.35.0
+components:
+  parameters:
+    userIdParam:
+      in: path
+      name: userId
+      required: true
+      schema:
+        type: string
+      description: User ID
+  schemas:
+    LightState:
+      type: object
+      properties:
+        on:
+          type: boolean
+          description: On/Off state of the light. On=true, Off=false
+        bri:
+          type: integer
+          format: uint8
+          description: Brightness of the light. This is a scale from the minimum brightness the light is capable of, 1, to the maximum capable brightness, 254.
+        hue:
+          type: integer
+          format: uint16
+          description: Hue of the light. This is a wrapping value between 0 and 65535. Note, that hue/sat values are hardware dependent which means that programming two devices with the same value does not garantuee that they will be the same color. Programming 0 and 65535 would mean that the light will resemble the color red, 21845 for green and 43690 for blue.
+        sat:
+          type: integer
+          format: uint8
+          description: Saturation of the light. 254 is the most saturated (colored) and 0 is the least saturated (white).
+        xy:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 2
+          maxItems: 2
+          description: The x and y coordinates of a color in CIE color space. The first entry is the x coordinate and the second entry is the y coordinate. Both x and y are between 0 and 1. Using CIE xy, the colors can be the same on all lamps if the coordinates are within every lamps gamuts (example “xy”:[0.409,0.5179] is the same color on all lamps). If not, the lamp will calculate it’s closest color and use that. The CIE xy color is absolute, independent from the hardware.
+        ct:
+          type: integer
+          format: uint16
+          description: The Mired Color temperature of the light. 2012 connected lights are capable of 153 (6500K) to 500 (2000K).
+        alert:
+          type: string
+          description: |
+            The alert effect, which is a temporary change to the bulb’s state. This can take one of the following values:
+            
+            *"none"* – The light is not performing an alert effect.
+            *“select”* – The light is performing one breathe cycle.
+            *“lselect”* – The light is performing breathe cycles for 15 seconds or until an `"alert"`: `"none"` command is received.
+            Note that this contains the last alert sent to the light and not its current state. i.e. After the breathe cycle has finished the bridge does not reset the alert to `"none"`.
+        effect:
+          type: string
+          description: The dynamic effect of the light, can either be “none” or “colorloop”.If set to colorloop, the light will cycle through all hues using the current brightness and saturation settings.
+        colormode:
+          type: string
+          enum: [hs, xy, ct]
+          description: Indicates the color mode in which the light is working, this is the last command type it received. Values are “hs” for Hue and Saturation, “xy” for XY and “ct” for Color Temperature. This parameter is only present when the light supports at least one of the values.
+        reachable:
+          type: boolean
+          description: ndicates if a light can be reached by the bridge.
+    LightAttributes:
+      type: object
+      properties:
+        state:
+          $ref: '#/components/schemas/LightState'
+          description: Details the state of the light.
+        type:
+          type: string
+          description: A fixed name describing the type of light e.g. “Extended color light”.
+        name:
+          type: string
+          description: A fixed name describing the type of light e.g. “Extended color light”.
+        modelid:
+          type: string
+          description: The hardware model of the light.
+        uniqueid:
+          type: string
+          description: >
+            Unique id of the device. The MAC address of the device with a unique endpoint id in the form: AA:BB:CC:DD:EE:FF:00:11-XX
+        manufacturedname:
+          type: string
+          description: The manufacturer name.
+        luminaireuniqueid:
+          type: string
+          description: |
+            Unique ID of the luminaire the light is a part of in the format: AA:BB:CC:DD-XX-YY.  AA:BB:, … represents the hex of the luminaireid, XX the lightsource position (incremental but may contain gaps) and YY the lightpoint position (index of light in luminaire group).  
+            
+            A gap in the lightpoint position indicates an incomplete luminaire (light search required to discover missing light points in this case).
+        streaming:
+          type: boolean
+          description: Current light supports streaming features
+        renderer:
+          type: boolean
+          description: Indicates if a lamp can be used for entertainment streaming as renderer
+        proxy:
+          type: boolean
+          description: Indicates if a lamp can be used for entertainment streaming as a proxy node
+        swversion:
+          type: string
+          description: An identifier for the software version running on the light.
+    NewLight:
+      type: object
+      properties:
+        name:
+          type: string
+    NewLights:
+      type: object
+      properties:
+        lastscan:
+          type: string
+          description: >
+            Returns “active” if a scan is currently on-going, “none” if a scan has not been performed since the bridge was powered on, or else the date and time that the last scan was completed in ISO 8601:2004 format (YYYY-MM-DDThh:mm:ss).
+          
+paths:
+  /{userId}/lights/new:
+    parameters:
+      - $ref: '#/components/parameters/userIdParam'
+    get:
+      summary: Get new lights
+      operationId: 'getNewLights'
+      responses:
+        '200':
+          description: >
+            Gets a list of lights that were discovered the last time a search for new lights was performed. The list of new lights is always deleted when a new search is started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewLights'
+              example: 
+                7:
+                  name: Hue Lamp 7
+                8:
+                  name: Hue Lamp 8
+                lastscan:
+                  '2012-10-29T12:00:00'
+
+  /{userId}/lights/{id}:
+    parameters:
+      - $ref: '#/components/parameters/userIdParam'
+    get:
+      summary: Get light attributes and state
+      description: |
+        Gets the attributes and state of a given light.
+        
+        Note the usage of the colormode parameter: There are 3 ways of setting the light color: xy, color temperature (ct) or hue and saturation (hs). A light may contain different settings for xy, ct and hs, but only the mode indicated by the colormode parameter will be certain to give the active light color.
+        
+        Also note that some light state attributes are only present for specific light types. See supported lights link for more information or supported lights jason link for JSON response examples.
+      operationId: 'getLightAttribute'
+      parameters: 
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: >
+            ID of light. Note: type undefined
+      responses:
+        '200':
+          description: |
+            Returns a list of all lights in the system. If there are no lights in the system then the bridge will return an empty object, {}.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LightAttributes'
+              example: 
+                state:
+                  hue: 1
+                  on: true
+                  effect: none
+                  alert: none
+                  bri: 200
+                  sat: 200
+                  ct: 500
+                  xy: [0.5, 0.5]
+                  reachable: true
+                  colormode: hs
+                type: Living Colors
+                name: LC 1
+                modelid: LC0015
+                swversion: 1.0.3
+            
+      externalDocs:
+        description: Original documentation
+        url: https://developers.meethue.com/develop/hue-api/lights-api/
